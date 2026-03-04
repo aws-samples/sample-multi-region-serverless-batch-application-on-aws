@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: '(SO9169) Global Resources Stack'
+Transform:
+  - AWS::LanguageExtensions
+Parameters:
+  Env:
+    Type: String
+    Default: ''
+    Description: String to enable multiple deployments per AWS region
+  PrimaryRegion:
+    Type: String
+    Description: Enter the Primary Region
+    Default: "us-east-1"
+  SecondaryRegion:
+    Type: String
+    Description: Enter the Secondary Region
+    Default: "us-west-2"
+
+Resources:
+  ##### DynamoDB Global Table for Batch State #######
+  BatchStateTable:
+    Type: AWS::DynamoDB::GlobalTable
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: "fileName"
+          AttributeType: "S"
+        - AttributeName: "status"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "fileName"
+          KeyType: "HASH"
+      Replicas:
+        - Region: !Ref PrimaryRegion
+          PointInTimeRecoverySpecification:
+            PointInTimeRecoveryEnabled: true
+        - Region: !Ref SecondaryRegion
+          PointInTimeRecoverySpecification:
+            PointInTimeRecoveryEnabled: true
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      SSESpecification:
+        SSEEnabled: true
+      GlobalSecondaryIndexes:
+      - IndexName: status-index
+        KeySchema:
+        - AttributeName: status
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
+  BatchStateTableSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub BatchStateTableNameSecret${Env}
+      Description: "DDB Batch State Table"
+      KmsKeyId: "alias/aws/secretsmanager"
+      SecretString: !Ref BatchStateTable
+      ReplicaRegions:
+        - Region: !Ref SecondaryRegion
+  ##### SMTP Credentials for SES Service #######
+  SmtpIamUserGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonSESFullAccess"
+      Path: '/'
+  SmtpIamUser:
+    Type: AWS::IAM::User
+    Properties:
+      Path: '/'
+  SmtpAddUserToGroup:
+    Type: AWS::IAM::UserToGroupAddition
+    Properties:
+      GroupName: !Ref SmtpIamUserGroup
+      Users:
+        - !Ref SmtpIamUser
+  SmtpIamUserCredentials:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref SmtpIamUser
+
+  SmtpUserCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub SmtpCredentialsSecret${Env}
+      Description: "SMTP User Access Keys"
+      KmsKeyId: "alias/aws/secretsmanager"
+      ReplicaRegions:
+        - Region: !Ref SecondaryRegion
+      SecretString:
+        Fn::ToJsonString:
+          AccessKey: !Ref SmtpIamUserCredentials
+          SecretAccessKey: !GetAtt SmtpIamUserCredentials.SecretAccessKey
+Outputs:
+  BatchStateTable:
+    Description: "Batch State Table"
+    Value: !Ref BatchStateTable
+  BatchStateTableSecret:
+    Description: "Replicated AWS Secret storing the Batch State DynamoDB Global Table's name"
+    Value: !Ref BatchStateTableSecret
+  SmtpCredentialsSecret:
+    Description: "SMTP User Credentials"
+    Value: !Ref SmtpUserCredentials
