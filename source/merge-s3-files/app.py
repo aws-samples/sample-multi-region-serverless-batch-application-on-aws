@@ -61,7 +61,8 @@ def lambda_handler(event, context):
         s3_target_key = output_path + "/" + get_output_filename(key)
         response = s3_client.put_object(Bucket=bucket,
                                         Key=s3_target_key,
-                                        Body=output_body)
+                                        Body=output_body,
+                                        ServerSideEncryption='aws:kms')
 
         line_num = 0
         lines = output_body.splitlines();

@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: 
   - AWS::Serverless-2016-10-31
@@ -148,7 +150,7 @@ Resources:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
       CodeUri: ../source/split-ip-file/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       Tracing: Active
       VpcConfig:
         SubnetIds:
@@ -183,7 +185,7 @@ Resources:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
       Tracing: Active
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       VpcConfig:
         SubnetIds:
           - !Sub '{{resolve:ssm:Subnet1${Env}}}'
@@ -221,7 +223,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/merge-s3-files/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       VpcConfig:
         SubnetIds:
           - !Sub '{{resolve:ssm:Subnet1${Env}}}'
@@ -257,7 +259,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/send-email/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       VpcConfig:
         SubnetIds:
           - !Sub '{{resolve:ssm:Subnet1${Env}}}'
@@ -369,7 +371,25 @@ Resources:
                 - - !Sub 'arn:${AWS::Partition}:iam::'
                   - !Ref 'AWS::AccountId'
                   - ':root'
-            Action: 'kms:*'
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey*'
             Resource: '*'
           - Sid: Enable Cloudwatch access
             Effect: Allow
@@ -412,7 +432,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/get-data/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       VpcConfig:
         SubnetIds:
           - !Sub '{{resolve:ssm:Subnet1${Env}}}'
@@ -454,7 +474,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/read-file/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: !Sub 'ReadFileFunction${Env}'
@@ -488,6 +508,7 @@ Resources:
         PointInTimeRecoveryEnabled: true
       SSESpecification:
         SSEEnabled: true
+        SSEType: KMS
       AttributeDefinitions:
         - AttributeName: uuid
           AttributeType: S
@@ -503,6 +524,7 @@ Resources:
         PointInTimeRecoveryEnabled: true
       SSESpecification:
         SSEEnabled: true
+        SSEType: KMS
       AttributeDefinitions:
         - AttributeName: uuid
           AttributeType: S
@@ -519,7 +541,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/write-output-chunk/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: !Sub 'WriteOutputChunkFunction${Env}'
@@ -553,7 +575,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/validate-data/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: !Sub 'ValidateDataFunction${Env}'
@@ -585,7 +607,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/region-writer/
       Handler: app.handler
-      Runtime: python3.9
+      Runtime: python3.12
       MemorySize: 256
       Timeout: 120
       Policies:
@@ -622,7 +644,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/mrap-routing/
       Handler: app.handler
-      Runtime: python3.9
+      Runtime: python3.12
       MemorySize: 256
       Timeout: 120
       Policies:
@@ -665,7 +687,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/active-region-monitor/
       Handler: app.handler
-      Runtime: python3.9
+      Runtime: python3.12
       MemorySize: 128
       Timeout: 30
       Policies:
@@ -731,7 +753,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/s3-lambda-notification/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       VpcConfig:
         SubnetIds:
           - !Sub '{{resolve:ssm:Subnet1${Env}}}'
@@ -838,7 +860,7 @@ Resources:
       Description: Function to apply notification to the S3 bucket
       CodeUri: ../source/custom-resource/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       Role: !GetAtt PostStackProcessingFunctionRole.Arn
       Environment:
         Variables:
@@ -894,7 +916,7 @@ Resources:
       Tracing: Active
       CodeUri: ../source/reconciliation-trigger/
       Handler: app.handler
-      Runtime: python3.9
+      Runtime: python3.12
       MemorySize: 128
       Timeout: 30
       Policies:

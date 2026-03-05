@@ -1,4 +1,6 @@
-﻿AWSTemplateFormatVersion: 2010-09-09
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+AWSTemplateFormatVersion: 2010-09-09
 Description: '(SO9169) AWS CloudFormation Sample Template for a VPC with private subnets'
 
 Parameters:
@@ -325,6 +327,11 @@ Resources:
   SourceBucket:
     Type: AWS::S3::Bucket
     Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -347,6 +354,11 @@ Resources:
   LoggingBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:

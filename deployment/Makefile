@@ -115,12 +115,17 @@ destroy-all:
 
 	@echo ""
 	@echo "=== Phase 4: Remove primary regional VPC stack (empty buckets, then delete) ==="
+	@echo "Waiting 60s for Lambda ENIs to detach from VPC subnets..."
+	@sleep 60
 	$(eval result:=$(shell aws cloudformation list-stack-resources --region $(PRIMARY_REGION) --stack-name regionalVPC$(ENV) --query "StackResourceSummaries[?LogicalResourceId=='SourceBucket'].{PhysicalResourceId: PhysicalResourceId}" --output text 2>/dev/null | cut -d: -f6 ))
 	@-./cleanup.sh $(result)
 	$(eval result:=$(shell aws cloudformation list-stack-resources --region $(PRIMARY_REGION) --stack-name regionalVPC$(ENV) --query "StackResourceSummaries[?LogicalResourceId=='LoggingBucket'].{PhysicalResourceId: PhysicalResourceId}" --output text 2>/dev/null | cut -d: -f6 ))
 	@-./cleanup.sh $(result)
 	@aws cloudformation delete-stack --stack-name regionalVPC$(ENV) --region $(PRIMARY_REGION)
-	@aws cloudformation wait stack-delete-complete --stack-name regionalVPC$(ENV) --region $(PRIMARY_REGION)
+	@aws cloudformation wait stack-delete-complete --stack-name regionalVPC$(ENV) --region $(PRIMARY_REGION) || \
+		(echo "Retry: waiting 120s for ENI cleanup..." && sleep 120 && \
+		aws cloudformation delete-stack --stack-name regionalVPC$(ENV) --region $(PRIMARY_REGION) && \
+		aws cloudformation wait stack-delete-complete --stack-name regionalVPC$(ENV) --region $(PRIMARY_REGION))
 
 	@echo ""
 	@echo "=== Phase 5: Remove secondary regional VPC stack (empty buckets, then delete) ==="
@@ -129,7 +134,10 @@ destroy-all:
 	$(eval result:=$(shell aws cloudformation list-stack-resources --region $(SECONDARY_REGION) --stack-name regionalVPC$(ENV) --query "StackResourceSummaries[?LogicalResourceId=='LoggingBucket'].{PhysicalResourceId: PhysicalResourceId}" --output text 2>/dev/null | cut -d: -f6 ))
 	@-./cleanup.sh $(result)
 	@aws cloudformation delete-stack --stack-name regionalVPC$(ENV) --region $(SECONDARY_REGION)
-	@aws cloudformation wait stack-delete-complete --stack-name regionalVPC$(ENV) --region $(SECONDARY_REGION)
+	@aws cloudformation wait stack-delete-complete --stack-name regionalVPC$(ENV) --region $(SECONDARY_REGION) || \
+		(echo "Retry: waiting 120s for ENI cleanup..." && sleep 120 && \
+		aws cloudformation delete-stack --stack-name regionalVPC$(ENV) --region $(SECONDARY_REGION) && \
+		aws cloudformation wait stack-delete-complete --stack-name regionalVPC$(ENV) --region $(SECONDARY_REGION))
 
 	@echo ""
 	@echo "=== Phase 6: Remove shared infrastructure ==="

@@ -3,8 +3,8 @@
 ## Getting started
 
 This guidance helps customers design and operate a multi-Region, serverless batch solution on AWS using services like 
-Step Functions, DynamoDB Global Tables, S3 Multi-Region Access Points, Route53 Application Recovery Controller and 
-Lambda functions. The solution is deployed across two Regions that can failover and failback from one Region to another 
+AWS Step Functions, Amazon DynamoDB Global Tables, Amazon S3 Multi-Region Access Points, Amazon Route 53 Application Recovery Controller, and 
+AWS Lambda functions. The solution is deployed across two Regions that can failover and failback from one Region to another 
 in an automated fashion. It leverages Amazon Route 53 Application Recovery Controller to help with the regional failover 
 using AWS Systems Manager documents, S3 Multi-Region Access Points to provide a unified endpoint for S3 access that 
 spans multiple Region, and DynamoDB Global Tables for persisting batch state and tracking.
@@ -77,7 +77,7 @@ The step function based batch processing solution follows the architecture outli
 * Install the latest version of AWS CLI v2 on your machine, including configuring the CLI for a specific account and region
 profile.  Please follow the [AWS CLI setup instructions](https://github.com/aws/aws-cli).  Make sure you have a 
 default profile set up; you may need to run `aws configure` if you have never set up the CLI before. 
-* Install Python version 3.9 on your machine. Please follow the [Download and Install Python](https://www.python.org/downloads/) instructions.
+* Install Python version 3.12 on your machine. Please follow the [Download and Install Python](https://www.python.org/downloads/) instructions.
 * Install the latest version of AWS SAM CLI on your machine. Please follow the [Install AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 * Install `make` for your OS if it is not already there. 
 
@@ -217,6 +217,18 @@ aws ssm start-automation-execution --document-name "AutomationFailoverRunbook" -
 
 ## Security
 See [CONTRIBUTING](CONTRIBUTING.md) for more information.
+
+This solution implements several security best practices:
+- All AWS Lambda functions run inside a VPC with private subnets
+- Amazon S3 buckets use server-side encryption and block public access
+- Amazon DynamoDB tables use encryption at rest
+- AWS Secrets Manager stores sensitive configuration
+- VPC endpoints provide private connectivity to AWS services
+- AWS KMS customer managed keys encrypt CloudWatch Logs
+
+For information about reporting security vulnerabilities, see [SECURITY](SECURITY.md).
+
+This solution follows the [AWS Shared Responsibility Model](https://aws.amazon.com/compliance/shared-responsibility-model/). Customers are responsible for securing their own AWS accounts and configuring IAM policies according to the principle of least privilege.
 
 ## License
 This library is licensed under the MIT-0 License. See the [LICENSE](LICENSE) file.

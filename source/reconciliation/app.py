@@ -1,3 +1,6 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
 import json
 import logging
 import os
@@ -39,7 +42,7 @@ def lambda_handler(event, context):
                 'Key': key
             }
             bucket = s3.Bucket(secondary_region_bucket)
-            response_data = bucket.copy(copy_source, key)
+            response_data = bucket.copy(copy_source, key, ExtraArgs={'ServerSideEncryption': 'aws:kms'})
             logger.info({"----- file copied successfully: ", json.dumps(response_data)})
 
         except Exception as err:

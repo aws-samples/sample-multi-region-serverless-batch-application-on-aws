@@ -52,7 +52,8 @@ def lambda_handler(event, context):
 
     response = s3_client.put_object(Bucket=bucket_info['bucket'],
                                     Key=bucket_info['key'],
-                                    Body=out_file.getvalue())
+                                    Body=out_file.getvalue(),
+                                    ServerSideEncryption='aws:kms')
 
     if response['ResponseMetadata']['HTTPStatusCode'] != 200:
         message = 'Writing chunk to S3 failed' + json.dumps(response, indent=2)

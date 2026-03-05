@@ -1,3 +1,6 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
 AWSTemplateFormatVersion: "2010-09-09"
 Description: '(SO9169) Routing Controls'
 
@@ -113,7 +116,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub ${ReplicationRuleSetupCustomLambda}${Env}
-      Runtime: python3.9
+      Runtime: python3.12
       Role: !GetAtt LambdaExecutionRole.Arn
       Handler: index.lambda_handler
       Timeout: 90
