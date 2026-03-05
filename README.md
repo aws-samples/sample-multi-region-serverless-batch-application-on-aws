@@ -230,5 +230,20 @@ For information about reporting security vulnerabilities, see [SECURITY](SECURIT
 
 This solution follows the [AWS Shared Responsibility Model](https://aws.amazon.com/compliance/shared-responsibility-model/). Customers are responsible for securing their own AWS accounts and configuring IAM policies according to the principle of least privilege.
 
+## Known Security Findings
+
+This sample application has been scanned with Checkov and other static analysis tools. The following findings have been reviewed and accepted for this sample. For a production deployment, you should evaluate and address these based on your organization's security requirements.
+
+| Finding | Description | Justification |
+|---------|-------------|---------------|
+| CKV_AWS_115 | Lambda functions lack reserved concurrent execution limits | Setting per-function limits requires careful capacity planning that varies by workload and account limits. Configure based on your expected throughput. |
+| CKV_AWS_116 | Lambda functions lack Dead Letter Queues | Adding DLQs requires additional SQS resources and error-handling logic specific to your operational requirements. |
+| CKV_AWS_117 | Some Lambda functions are not in a VPC | Five functions (ActiveRegionMonitor, MrapRouting, SendEmail, ReadFile, PostStackProcessing) operate outside the VPC by design to access services not available through VPC endpoints. |
+| CKV_AWS_119 | DynamoDB tables use AWS managed encryption instead of customer-managed KMS keys | The tables use SSE with KMS (`SSEType: KMS`). For additional control, replace with a customer-managed CMK. |
+| CKV_AWS_120 | API Gateway caching is not enabled | Caching is not required for this batch processing use case where each request contains unique data. |
+| CKV_AWS_149 | Secrets Manager secrets use the AWS managed key instead of a customer-managed KMS key | Acceptable for a sample. For production, create and reference a customer-managed CMK. |
+| CKV_AWS_173 | Lambda environment variables are not encrypted with a customer-managed KMS key | Environment variables do not contain secrets; sensitive values are retrieved at runtime from Secrets Manager. |
+| CKV_AWS_18 | Logging bucket does not have access logging enabled | The logging bucket is itself the log destination. Enabling self-logging would create an infinite loop. |
+
 ## License
 This library is licensed under the MIT-0 License. See the [LICENSE](LICENSE) file.
