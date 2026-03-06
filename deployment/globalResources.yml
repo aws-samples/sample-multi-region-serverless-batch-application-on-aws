@@ -53,6 +53,11 @@ Resources:
           ProjectionType: ALL
   BatchStateTableSecret:
     Type: AWS::SecretsManager::Secret
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_149
+            comment: AWS managed key acceptable for sample
     Properties:
       Name: !Sub BatchStateTableNameSecret${Env}
       Description: "DDB Batch State Table"
@@ -84,6 +89,11 @@ Resources:
 
   SmtpUserCredentials:
     Type: AWS::SecretsManager::Secret
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_149
+            comment: AWS managed key acceptable for sample
     Properties:
       Name: !Sub SmtpCredentialsSecret${Env}
       Description: "SMTP User Access Keys"

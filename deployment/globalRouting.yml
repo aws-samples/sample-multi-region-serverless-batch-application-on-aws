@@ -43,6 +43,11 @@ Resources:
         - Bucket: !Sub '{{resolve:secretsmanager:${SecondaryRegionBucketSecretName}:SecretString:SourceBucket}}'
   SourceBucketMRAPSecret:
     Type: AWS::SecretsManager::Secret
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_149
+            comment: AWS managed key acceptable for sample
     Properties:
       Name: !Sub SourceBucketMRAPSecret${Env}
       Description: "S3 MRAP Alias"
@@ -114,6 +119,17 @@ Resources:
                 Resource: "arn:aws:s3:::*"
   CustomBackedLambda:
     Type: AWS::Lambda::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_117
+            comment: Custom resource Lambda does not need VPC access
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       FunctionName: !Sub ${ReplicationRuleSetupCustomLambda}${Env}
       Runtime: python3.12

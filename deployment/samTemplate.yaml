@@ -145,6 +145,15 @@ Resources:
 
   SplitInputFileFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
@@ -178,6 +187,15 @@ Resources:
 
   AutomationReconciliationFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       FunctionName: !Sub AutomationReconciliationFunction${Env}
       CodeUri: ../source/reconciliation/
@@ -217,6 +235,15 @@ Resources:
 
   MergeS3FilesFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
@@ -253,6 +280,15 @@ Resources:
 
   SendEmailFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
@@ -327,6 +363,11 @@ Resources:
   Api:
     Type: AWS::Serverless::Api
     DependsOn: ApiCWLRoleArn
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_120
+            comment: Caching not required for batch processing with unique data per request
     Properties:
       TracingEnabled: true
       StageName: Prod
@@ -426,6 +467,15 @@ Resources:
 
   GetDataFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
@@ -468,6 +518,15 @@ Resources:
 
   ReadFileFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
@@ -503,6 +562,11 @@ Resources:
 
   FinancialTable:
     Type: AWS::DynamoDB::Table
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_119
+            comment: Uses SSE with KMS managed key, customer CMK not required for sample
     Properties:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
@@ -519,6 +583,11 @@ Resources:
 
   ErrorTable:
     Type: AWS::DynamoDB::Table
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_119
+            comment: Uses SSE with KMS managed key, customer CMK not required for sample
     Properties:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
@@ -535,6 +604,15 @@ Resources:
 
   WriteOutputChunkFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
@@ -569,6 +647,15 @@ Resources:
 
   ValidateDataFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
@@ -600,6 +687,17 @@ Resources:
   ##### Region Writer Lambda #######
   RegionWriterFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_117
+            comment: Function operates outside VPC by design
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       FunctionName: !Sub "${NamingPrefix}RegionWriter${Env}"
       Layers:
@@ -637,6 +735,17 @@ Resources:
   ##### MRAP Routing Lambda #######
   MrapRoutingFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_117
+            comment: Function operates outside VPC by design
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       FunctionName: !Sub "${NamingPrefix}MrapRouting${Env}"
       Layers:
@@ -680,6 +789,17 @@ Resources:
   ##### Active Region Monitor Lambda #######
   ActiveRegionMonitorFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_117
+            comment: Function operates outside VPC by design
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       FunctionName: !Sub "${NamingPrefix}ActiveRegionMonitor${Env}"
       Layers:
@@ -747,6 +867,15 @@ Resources:
 
   S3NotificationLambdaFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
@@ -853,6 +982,15 @@ Resources:
 
   PostStackProcessingFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
@@ -909,6 +1047,17 @@ Resources:
   ##### Reconciliation Trigger Lambda #######
   ReconciliationTriggerFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_115
+            comment: Concurrency limits require capacity planning per environment
+          - id: CKV_AWS_116
+            comment: DLQ requires additional SQS resources specific to operational requirements
+          - id: CKV_AWS_117
+            comment: Function operates outside VPC by design
+          - id: CKV_AWS_173
+            comment: Environment variables do not contain secrets
     Properties:
       FunctionName: !Sub "${NamingPrefix}ReconciliationTrigger${Env}"
       Layers:

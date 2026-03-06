@@ -262,6 +262,11 @@ Resources:
 ############
   VpcId:
     Type: AWS::SecretsManager::Secret
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_149
+            comment: AWS managed key acceptable for sample
     Properties:
       Name: !Sub VpcId-${AWS::Region}${Env}
       Description: "VPC Id"
@@ -343,6 +348,11 @@ Resources:
 
   SourceBucketSecret:
     Type: AWS::SecretsManager::Secret
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_149
+            comment: AWS managed key acceptable for sample
     Properties:
       Name: !Sub SourceBucket-${AWS::Region}${Env}
       Description: "Source Bucket ARN"
@@ -353,6 +363,11 @@ Resources:
 
   LoggingBucket:
     Type: 'AWS::S3::Bucket'
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_18
+            comment: Logging bucket is itself the log destination, self-logging would create infinite loop
     Properties:
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
