@@ -18,3 +18,4 @@ credentials
 *.pem
 *.key
 *.zip
+scan-report.json
