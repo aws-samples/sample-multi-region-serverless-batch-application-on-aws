@@ -146,7 +146,7 @@ prValidation.addJobs({
     steps: [
       { uses: 'actions/checkout@v4' },
       { uses: 'actions/setup-python@v5', with: { 'python-version': PYTHON_VERSION } },
-      { name: 'Install test deps', run: 'pip install pytest hypothesis moto && find source -name requirements.txt -exec pip install -r {} \\;' },
+      { name: 'Install test deps', run: 'pip install pytest hypothesis moto aws-xray-sdk && find source -name requirements.txt -exec pip install -r {} \\;' },
       { name: 'Run tests', run: 'pytest source/ -v --tb=short' },
     ],
   },

@@ -34,6 +34,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test deps
-        run: pip install pytest hypothesis moto && find source -name requirements.txt -exec pip install -r {} \;
+        run: pip install pytest hypothesis moto aws-xray-sdk && find source -name requirements.txt -exec pip install -r {} \;
       - name: Run tests
         run: pytest source/ -v --tb=short
