@@ -170,6 +170,24 @@ Resources:
               - iam:CreatePolicyVersion
               - iam:DeletePolicyVersion
               - iam:ListPolicyVersions
+              - iam:CreateUser
+              - iam:DeleteUser
+              - iam:GetUser
+              - iam:UpdateUser
+              - iam:TagUser
+              - iam:UntagUser
+              - iam:ListUserTags
+              - iam:CreateGroup
+              - iam:DeleteGroup
+              - iam:GetGroup
+              - iam:AddUserToGroup
+              - iam:RemoveUserFromGroup
+              - iam:PutGroupPolicy
+              - iam:DeleteGroupPolicy
+              - iam:GetGroupPolicy
+              - iam:CreateAccessKey
+              - iam:DeleteAccessKey
+              - iam:ListAccessKeys
             Resource: '*'
           - Sid: Route53
             Effect: Allow
