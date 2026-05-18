@@ -131,6 +131,10 @@ Resources:
               - dynamodb:UpdateGlobalTable
               - dynamodb:DescribeGlobalTableSettings
               - dynamodb:UpdateGlobalTableSettings
+              - dynamodb:CreateGlobalTableWitness
+              - dynamodb:DeleteGlobalTableWitness
+              - dynamodb:DescribeGlobalTableWitness
+              - dynamodb:UpdateGlobalTableWitness
             Resource: !Sub 'arn:aws:dynamodb:*:${AWS::AccountId}:table/*'
 
   # Global services: IAM, Route 53, ARC, S3 (including MRAP/S3 Control), STS.
