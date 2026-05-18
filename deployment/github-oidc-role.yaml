@@ -107,6 +107,7 @@ Resources:
               - sns:*
               - sqs:*
               - fis:*
+              - application-autoscaling:*
               - tag:*
               - resource-groups:*
             Resource: '*'
@@ -185,6 +186,9 @@ Resources:
               - iam:PutGroupPolicy
               - iam:DeleteGroupPolicy
               - iam:GetGroupPolicy
+              - iam:AttachGroupPolicy
+              - iam:DetachGroupPolicy
+              - iam:ListAttachedGroupPolicies
               - iam:CreateAccessKey
               - iam:DeleteAccessKey
               - iam:ListAccessKeys
