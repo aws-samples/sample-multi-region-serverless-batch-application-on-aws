@@ -50,7 +50,7 @@ Parameters:
   PowerToolsLambdaLayerAccountId:
     Type: String
     Description: The AWS AccountId where the PowerTools Python Lambda Layer is hosted
-    Default: 123456789012
+    Default: '017000801446'
   NamingPrefix:
     Type: String
     Default: "BatchFailover"
