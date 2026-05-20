@@ -73,7 +73,7 @@ jobs:
         run: |-
           # 1. Get the Main Orchestrator Step Function ARN from the batch stack
           SFN_ARN=$(aws cloudformation describe-stack-resource --stack-name batch${{ env.ENV }} \
-            --logical-resource-id MainOrchestratorStateMachine --region ${{ env.AWS_REGION }} \
+            --logical-resource-id BlogBatchMainOrchestrator --region ${{ env.AWS_REGION }} \
             --query "StackResourceDetail.PhysicalResourceId" --output text)
           echo "Main Orchestrator SFN: $SFN_ARN"
 
