@@ -77,15 +77,20 @@ jobs:
             --query "StackResourceDetail.PhysicalResourceId" --output text)
           echo "Main Orchestrator SFN: $SFN_ARN"
 
-          # 2. Get the MRAP ARN from the global-routing stack
-          MRAP_ARN=$(aws cloudformation describe-stacks --stack-name global-routing${{ env.ENV }} \
+          # 2. Get the MRAP alias and construct full ARN (s3 cp requires arn:aws:s3::<account>:accesspoint/<alias>)
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          MRAP_ALIAS=$(aws cloudformation describe-stacks --stack-name global-routing${{ env.ENV }} \
             --region ${{ env.AWS_REGION }} --query "Stacks[0].Outputs[?contains(OutputKey,'MRAP') || contains(OutputKey,'Mrap') || contains(OutputKey,'AccessPoint')].OutputValue" --output text)
-          # Fallback: construct MRAP ARN from account + naming convention
-          if [ -z "$MRAP_ARN" ]; then
-            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          # Fallback: query S3 control API directly
+          if [ -z "$MRAP_ALIAS" ]; then
             MRAP_ALIAS=$(aws s3control get-multi-region-access-point --account-id $ACCOUNT_ID \
               --name source-bucket-mrap${{ env.ENV }} --region us-west-2 \
               --query "AccessPoint.Alias" --output text)
+          fi
+          # Strip any arn: prefix if stack output was a full ARN already
+          if [[ "$MRAP_ALIAS" == arn:* ]]; then
+            MRAP_ARN="$MRAP_ALIAS"
+          else
             MRAP_ARN="arn:aws:s3::${ACCOUNT_ID}:accesspoint/${MRAP_ALIAS}"
           fi
           echo "MRAP: $MRAP_ARN"
@@ -117,6 +122,12 @@ jobs:
             fi
             echo "  Attempt $i: execution not complete yet..."
           done
+          # Fail if loop exhausted without success
+          if [ "$EXEC" = "None" ] || [ -z "$EXEC" ]; then
+            echo "ERROR: Step Function execution did not complete within 10 minutes"
+            aws stepfunctions list-executions --state-machine-arn "$SFN_ARN" --max-results 3 --no-cli-pager
+            exit 1
+          fi
 
           # 5. Verify CloudWatch dashboard exists
           echo "Checking CloudWatch dashboard..."

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #set -xv
 BUCKET=$1
 # test if an s3 bucket exists and delete all objects and delete markers from it
