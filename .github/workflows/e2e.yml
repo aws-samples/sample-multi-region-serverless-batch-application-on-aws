@@ -18,7 +18,7 @@ on:
       - .github/workflows/e2e.yml
   workflow_dispatch: {}
 concurrency:
-  group: e2e-${{ github.ref }}
+  group: e2e-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   e2e:
@@ -45,6 +45,9 @@ jobs:
         run: |-
           sudo apt-get update -qq && sudo apt-get install -y -qq jq
           pip3 install boto3 aws-sam-cli --quiet
+      - name: Pre-deploy cleanup (tear down any leftover stacks for this SHA)
+        run: make destroy-all ENV=${{ env.ENV }} || true
+        working-directory: deployment
       - name: Deploy (full multi-region)
         run: make deploy ENV=${{ env.ENV }}
         working-directory: deployment

@@ -158,7 +158,7 @@ const E2E_PATHS = ['source/**', 'deployment/**', '.github/workflows/e2e.yml'];
 const e2e = new github.GithubWorkflow(project.github!, 'e2e', {
   limitConcurrency: true,
   concurrencyOptions: {
-    group: 'e2e-${{ github.ref }}',
+    group: 'e2e-${{ github.head_ref || github.ref_name }}',
     cancelInProgress: true,
   },
 });
@@ -200,6 +200,11 @@ e2e.addJob('e2e', {
         'sudo apt-get update -qq && sudo apt-get install -y -qq jq',
         'pip3 install boto3 aws-sam-cli --quiet',
       ].join('\n'),
+    },
+    {
+      name: 'Pre-deploy cleanup (tear down any leftover stacks for this SHA)',
+      workingDirectory: 'deployment',
+      run: 'make destroy-all ENV=${{ env.ENV }} || true',
     },
     {
       name: 'Deploy (full multi-region)',
