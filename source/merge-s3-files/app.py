@@ -42,20 +42,8 @@ def lambda_handler(event, context):
     try:
         for item in s3_client.list_objects_v2(Bucket=bucket, Prefix=output_path)['Contents']:
             if item['Key'].endswith('.csv'):
-                resp = s3_client.select_object_content(
-                    Bucket=bucket,
-                    Key=item['Key'],
-                    ExpressionType='SQL',
-                    Expression="select * from s3object",
-                    InputSerialization={'CSV': {"FileHeaderInfo": "NONE"}, 'CompressionType': 'NONE'},
-                    OutputSerialization={'CSV': {}},
-                )
-
-                for event in resp['Payload']:
-                    if 'Records' in event:
-                        records = event['Records']['Payload'].decode('utf-8')
-                        payloads = (''.join(response for response in records))
-                        output.append(payloads)
+                obj = s3_client.get_object(Bucket=bucket, Key=item['Key'])
+                output.append(obj['Body'].read().decode('utf-8'))
 
         output_body = "".join(output)
         s3_target_key = output_path + "/" + get_output_filename(key)
