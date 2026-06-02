@@ -1,0 +1,13 @@
+{
+  "name": "sample-multi-region-serverless-batch-application-on-aws",
+  "private": true,
+  "scripts": {
+    "default": "npx ts-node --prefer-ts-exts .projenrc.ts",
+    "projen": "npx projen"
+  },
+  "devDependencies": {
+    "projen": "^0.91.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}

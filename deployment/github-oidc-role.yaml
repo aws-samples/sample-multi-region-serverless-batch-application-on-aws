@@ -1,0 +1,230 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# ─── PURPOSE ────────────────────────────────────────────────────────────────────
+# Creates an IAM role that GitHub Actions assumes via OIDC to run the e2e
+# workflow (deploy, smoke-test, teardown) without long-lived credentials.
+#
+# ─── PREREQUISITES ──────────────────────────────────────────────────────────────
+# 1. An SSM parameter /github/oidc-provider-exists must exist in the target
+#    account. Set it to 'create' if no OIDC provider exists yet, or to the
+#    existing provider ARN to skip creation (shared across repos).
+#
+# ─── DEPLOY ─────────────────────────────────────────────────────────────────────
+#   aws cloudformation deploy \
+#     --stack-name github-oidc-serverless-batch-e2e \
+#     --template-file deployment/github-oidc-role.yaml \
+#     --capabilities CAPABILITY_NAMED_IAM \
+#     --region us-east-1
+#
+# ─── AFTER DEPLOY ───────────────────────────────────────────────────────────────
+# Copy the RoleArn output and set it as the E2E_ROLE_ARN secret on the GitHub
+# repo: Settings → Secrets and variables → Actions → New repository secret.
+#
+# ─── NOTES ──────────────────────────────────────────────────────────────────────
+# • MaxSessionDuration is 8h to cover full e2e cycle (SAM deploy ~30m per
+#   region + smoke test + teardown ~30m) with headroom.
+# • Trust policy restricts to pull_request and refs/heads/main only.
+# • Regional permissions are scoped to us-east-1 and us-west-2.
+# ────────────────────────────────────────────────────────────────────────────────
+AWSTemplateFormatVersion: '2010-09-09'
+Description: GitHub Actions OIDC role for e2e workflow
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Default: aws-samples
+  GitHubRepo:
+    Type: String
+    Default: sample-multi-region-serverless-batch-application-on-aws
+
+Conditions:
+  CreateOIDCProvider: !Equals
+    - !Sub '{{resolve:ssm:/github/oidc-provider-exists:1}}'
+    - 'create'
+
+Resources:
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+  E2ERole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: github-actions-serverless-batch-e2e
+      MaxSessionDuration: 28800
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - !Sub 'repo:${GitHubOrg}/${GitHubRepo}:pull_request'
+                  - !Sub 'repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/*'
+      ManagedPolicyArns:
+        - !Ref RegionalServicesPolicy
+        - !Ref GlobalServicesPolicy
+
+  # Regional services: CloudFormation, Lambda, Step Functions, DynamoDB,
+  # API Gateway, EC2/VPC, KMS, SecretsManager, SSM, CloudWatch, SES, Events.
+  # Scoped to us-east-1 and us-west-2.
+  RegionalServicesPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: github-actions-serverless-batch-e2e-regional
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: RegionalServiceAccess
+            Effect: Allow
+            Action:
+              - cloudformation:*
+              - lambda:*
+              - states:*
+              - dynamodb:*
+              - apigateway:*
+              - execute-api:*
+              - ec2:*
+              - kms:*
+              - secretsmanager:*
+              - ssm:*
+              - logs:*
+              - cloudwatch:*
+              - events:*
+              - ses:*
+              - sns:*
+              - sqs:*
+              - fis:*
+              - application-autoscaling:*
+              - tag:*
+              - resource-groups:*
+            Resource: '*'
+            Condition:
+              StringEquals:
+                aws:RequestedRegion:
+                  - us-east-1
+                  - us-west-2
+          # DynamoDB Global Table witness region (us-east-2)
+          - Sid: DynamoDBGlobalTableWitness
+            Effect: Allow
+            Action:
+              - dynamodb:CreateTable
+              - dynamodb:DeleteTable
+              - dynamodb:DescribeTable
+              - dynamodb:UpdateTable
+              - dynamodb:CreateTableReplica
+              - dynamodb:DeleteTableReplica
+              - dynamodb:DescribeGlobalTable
+              - dynamodb:CreateGlobalTable
+              - dynamodb:UpdateGlobalTable
+              - dynamodb:DescribeGlobalTableSettings
+              - dynamodb:UpdateGlobalTableSettings
+              - dynamodb:CreateGlobalTableWitness
+              - dynamodb:DeleteGlobalTableWitness
+              - dynamodb:DescribeGlobalTableWitness
+              - dynamodb:UpdateGlobalTableWitness
+            Resource: !Sub 'arn:aws:dynamodb:*:${AWS::AccountId}:table/*'
+
+  # Global services: IAM, Route 53, ARC, S3 (including MRAP/S3 Control), STS.
+  GlobalServicesPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: github-actions-serverless-batch-e2e-global
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: IAMForCFN
+            Effect: Allow
+            Action:
+              - iam:CreateRole
+              - iam:DeleteRole
+              - iam:GetRole
+              - iam:UpdateRole
+              - iam:UpdateAssumeRolePolicy
+              - iam:AttachRolePolicy
+              - iam:DetachRolePolicy
+              - iam:PutRolePolicy
+              - iam:DeleteRolePolicy
+              - iam:GetRolePolicy
+              - iam:ListRolePolicies
+              - iam:ListAttachedRolePolicies
+              - iam:PassRole
+              - iam:ListRoles
+              - iam:CreateServiceLinkedRole
+              - iam:DeleteServiceLinkedRole
+              - iam:GetServiceLinkedRoleDeletionStatus
+              - iam:TagRole
+              - iam:UntagRole
+              - iam:ListRoleTags
+              - iam:CreatePolicy
+              - iam:DeletePolicy
+              - iam:GetPolicy
+              - iam:GetPolicyVersion
+              - iam:CreatePolicyVersion
+              - iam:DeletePolicyVersion
+              - iam:ListPolicyVersions
+              - iam:CreateUser
+              - iam:DeleteUser
+              - iam:GetUser
+              - iam:UpdateUser
+              - iam:TagUser
+              - iam:UntagUser
+              - iam:ListUserTags
+              - iam:CreateGroup
+              - iam:DeleteGroup
+              - iam:GetGroup
+              - iam:AddUserToGroup
+              - iam:RemoveUserFromGroup
+              - iam:PutGroupPolicy
+              - iam:DeleteGroupPolicy
+              - iam:GetGroupPolicy
+              - iam:AttachGroupPolicy
+              - iam:DetachGroupPolicy
+              - iam:ListAttachedGroupPolicies
+              - iam:CreateAccessKey
+              - iam:DeleteAccessKey
+              - iam:ListAccessKeys
+            Resource: '*'
+          - Sid: Route53
+            Effect: Allow
+            Action:
+              - route53:*
+              - route53-recovery-control-config:*
+              - route53-recovery-cluster:*
+            Resource: '*'
+          - Sid: ARCRegionSwitch
+            Effect: Allow
+            Action:
+              - arc-region-switch:*
+              - arc-zonal-shift:*
+            Resource: '*'
+          - Sid: S3AndMRAP
+            Effect: Allow
+            Action:
+              - s3:*
+              - s3-outposts:*
+              - s3control:*
+            Resource: '*'
+          - Sid: Identity
+            Effect: Allow
+            Action:
+              - sts:GetCallerIdentity
+              - sts:GetSessionToken
+            Resource: '*'
+
+Outputs:
+  RoleArn:
+    Value: !GetAtt E2ERole.Arn
+    Description: Set this as the E2E_ROLE_ARN GitHub secret
