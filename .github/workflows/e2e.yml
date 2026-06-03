@@ -32,7 +32,7 @@ jobs:
       SECONDARY_REGION: us-west-2
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set ENV to short sha
         run: echo "ENV=-${GITHUB_SHA:0:7}" >> $GITHUB_ENV
       - name: Configure AWS credentials
