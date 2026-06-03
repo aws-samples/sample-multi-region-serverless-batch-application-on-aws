@@ -13,6 +13,8 @@ updates:
           - minor
           - patch
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/active-region-monitor
     schedule:
@@ -23,6 +25,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/custom-resource
     schedule:
@@ -33,6 +37,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/get-data
     schedule:
@@ -43,6 +49,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/merge-s3-files
     schedule:
@@ -53,6 +61,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/mrap-routing
     schedule:
@@ -63,6 +73,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/read-file
     schedule:
@@ -73,6 +85,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/reconciliation
     schedule:
@@ -83,6 +97,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/reconciliation-trigger
     schedule:
@@ -93,6 +109,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/region-writer
     schedule:
@@ -103,6 +121,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/s3-lambda-notification
     schedule:
@@ -113,6 +133,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/send-email
     schedule:
@@ -123,6 +145,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/split-ip-file
     schedule:
@@ -133,6 +157,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/validate-data
     schedule:
@@ -143,6 +169,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: pip
     directory: /source/write-output-chunk
     schedule:
@@ -153,6 +181,8 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -163,3 +193,5 @@ updates:
         update-types:
           - minor
           - patch
+    commit-message:
+      prefix: chore
