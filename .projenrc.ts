@@ -79,6 +79,11 @@ dep.config.updates.push(
   },
 );
 
+// Conventional-commit prefix so Dependabot PR titles pass the semantic-pull-request check
+dep.config.updates.forEach((u: Record<string, unknown>) => {
+  u['commit-message'] = { prefix: 'chore' };
+});
+
 // ─── Auto-merge for Dependabot patch PRs ───────────────────────────────────────
 const autoMerge = project.github!.addWorkflow('dependabot-auto-merge');
 autoMerge.on({ pullRequest: {} });
