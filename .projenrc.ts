@@ -70,14 +70,11 @@ dep.config.updates.push(
     'open-pull-requests-limit': 5,
     groups: NON_MAJOR_GROUP,
   })),
-  {
-    'package-ecosystem': 'github-actions',
-    directory: '/',
-    schedule: WEEKLY_SCHEDULE,
-    'open-pull-requests-limit': 5,
-    groups: NON_MAJOR_GROUP,
-  },
 );
+// NOTE: github-actions ecosystem intentionally NOT watched by Dependabot.
+// Action versions are pinned in this .projenrc.ts and the workflow YAMLs are
+// projen-generated, so Dependabot bumps to the YAML would be reverted on the
+// next `npx projen`. Bump action versions here instead.
 
 // Conventional-commit prefix so Dependabot PR titles pass the semantic-pull-request check
 dep.config.updates.forEach((u: Record<string, unknown>) => {
@@ -98,7 +95,7 @@ autoMerge.addJob('auto-merge', {
     {
       name: 'Fetch Dependabot metadata',
       id: 'metadata',
-      uses: 'dependabot/fetch-metadata@v2',
+      uses: 'dependabot/fetch-metadata@v3',
       with: { 'github-token': '${{ secrets.GITHUB_TOKEN }}' },
     },
     {
@@ -136,8 +133,8 @@ prValidation.addJobs({
     runsOn: ['ubuntu-latest'],
     permissions: { contents: github.workflows.JobPermission.READ },
     steps: [
-      { uses: 'actions/checkout@v4' },
-      { uses: 'actions/setup-python@v5', with: { 'python-version': PYTHON_VERSION } },
+      { uses: 'actions/checkout@v6' },
+      { uses: 'actions/setup-python@v6', with: { 'python-version': PYTHON_VERSION } },
       { name: 'Install cfn-lint', run: 'pip install cfn-lint' },
       {
         name: 'Run cfn-lint',
@@ -149,8 +146,8 @@ prValidation.addJobs({
     runsOn: ['ubuntu-latest'],
     permissions: { contents: github.workflows.JobPermission.READ },
     steps: [
-      { uses: 'actions/checkout@v4' },
-      { uses: 'actions/setup-python@v5', with: { 'python-version': PYTHON_VERSION } },
+      { uses: 'actions/checkout@v6' },
+      { uses: 'actions/setup-python@v6', with: { 'python-version': PYTHON_VERSION } },
       { name: 'Install test deps', run: 'pip install pytest hypothesis moto aws-xray-sdk && find source -name requirements.txt -exec pip install -r {} \\;' },
       { name: 'Run tests', run: 'pytest source/ -v --tb=short' },
     ],
@@ -185,14 +182,14 @@ e2e.addJob('e2e', {
     SECONDARY_REGION: 'us-west-2',
   },
   steps: [
-    { name: 'Checkout', uses: 'actions/checkout@v4' },
+    { name: 'Checkout', uses: 'actions/checkout@v6' },
     {
       name: 'Set ENV to short sha',
       run: 'echo "ENV=-${GITHUB_SHA:0:7}" >> $GITHUB_ENV',
     },
     {
       name: 'Configure AWS credentials',
-      uses: 'aws-actions/configure-aws-credentials@v4',
+      uses: 'aws-actions/configure-aws-credentials@v6',
       with: {
         'role-to-assume': '${{ secrets.E2E_ROLE_ARN }}',
         'aws-region': '${{ env.AWS_REGION }}',
