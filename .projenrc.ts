@@ -83,7 +83,8 @@ dep.config.updates.forEach((u: Record<string, unknown>) => {
 
 // ─── Auto-merge for Dependabot patch PRs ───────────────────────────────────────
 const autoMerge = project.github!.addWorkflow('dependabot-auto-merge');
-autoMerge.on({ pullRequest: {} });
+// pull_request_target gives the workflow a write-capable GITHUB_TOKEN even on Dependabot PRs (pull_request downgrades Dependabot runs to a read-only token, so approve/auto-merge 403). The patch-only metadata gate + dependabot[bot] actor guard below keep this safe.
+autoMerge.on({ pullRequestTarget: {} });
 autoMerge.addJob('auto-merge', {
   runsOn: ['ubuntu-latest'],
   permissions: {
