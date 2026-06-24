@@ -7,6 +7,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    labels:
+      - auto-approve
+      - auto-merge
     groups:
       all-minor-and-patch:
         update-types:
@@ -27,6 +30,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/custom-resource
     schedule:
@@ -39,6 +45,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/get-data
     schedule:
@@ -51,6 +60,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/merge-s3-files
     schedule:
@@ -63,6 +75,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/mrap-routing
     schedule:
@@ -75,6 +90,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/read-file
     schedule:
@@ -87,6 +105,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/reconciliation
     schedule:
@@ -99,6 +120,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/reconciliation-trigger
     schedule:
@@ -111,6 +135,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/region-writer
     schedule:
@@ -123,6 +150,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/s3-lambda-notification
     schedule:
@@ -135,6 +165,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/send-email
     schedule:
@@ -147,6 +180,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/split-ip-file
     schedule:
@@ -159,6 +195,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/validate-data
     schedule:
@@ -171,6 +210,9 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge
   - package-ecosystem: pip
     directory: /source/write-output-chunk
     schedule:
@@ -183,3 +225,6 @@ updates:
           - patch
     commit-message:
       prefix: chore
+    labels:
+      - auto-approve
+      - auto-merge

@@ -17,6 +17,8 @@ node_modules/
 .aws-sam/
 !/.github/workflows/stale.yml
 !/.github/dependabot.yml
-!/.github/workflows/dependabot-auto-merge.yml
+!/.github/workflows/auto-approve.yml
+!/.github/workflows/auto-merge.yml
+!/.github/workflows/dependency-review.yml
 !/.github/workflows/pr-validation.yml
 !/.github/workflows/e2e.yml

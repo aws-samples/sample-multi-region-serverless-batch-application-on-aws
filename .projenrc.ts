@@ -76,47 +76,70 @@ dep.config.updates.push(
 // projen-generated, so Dependabot bumps to the YAML would be reverted on the
 // next `npx projen`. Bump action versions here instead.
 
-// Conventional-commit prefix so Dependabot PR titles pass the semantic-pull-request check
+// Conventional-commit prefix + labels for auto-merge gating
 dep.config.updates.forEach((u: Record<string, unknown>) => {
   u['commit-message'] = { prefix: 'chore' };
+  u['labels'] = ['auto-approve', 'auto-merge'];
 });
 
-// ─── Auto-merge for Dependabot patch PRs ───────────────────────────────────────
-const autoMerge = project.github!.addWorkflow('dependabot-auto-merge');
-// pull_request_target gives the workflow a write-capable GITHUB_TOKEN even on Dependabot PRs (pull_request downgrades Dependabot runs to a read-only token, so approve/auto-merge 403). The patch-only metadata gate + dependabot[bot] actor guard below keep this safe.
-autoMerge.on({ pullRequestTarget: {} });
-autoMerge.addJob('auto-merge', {
+// ─── Auto-approve for labeled Dependabot PRs ───────────────────────────────────
+const autoApprove = project.github!.addWorkflow('auto-approve');
+autoApprove.on({
+  pullRequestTarget: { types: ['labeled', 'opened', 'synchronize', 'reopened', 'ready_for_review'] },
+});
+autoApprove.addJob('auto-approve', {
   runsOn: ['ubuntu-latest'],
   permissions: {
-    contents: github.workflows.JobPermission.WRITE,
     pullRequests: github.workflows.JobPermission.WRITE,
   },
-  if: "github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]'",
+  if: "contains(github.event.pull_request.labels.*.name, 'auto-approve') && github.actor == 'dependabot[bot]'",
   steps: [
     {
-      name: 'Fetch Dependabot metadata',
-      id: 'metadata',
-      uses: 'dependabot/fetch-metadata@v3',
-      with: { 'github-token': '${{ secrets.GITHUB_TOKEN }}' },
-    },
-    {
-      name: 'Approve patch updates',
-      if: "steps.metadata.outputs.update-type == 'version-update:semver-patch'",
+      name: 'Approve PR',
       run: 'gh pr review --approve "$PR_URL"',
       env: {
         PR_URL: '${{ github.event.pull_request.html_url }}',
         GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}',
       },
     },
+  ],
+});
+
+// ─── Auto-merge for Dependabot PRs ─────────────────────────────────────────────
+const autoMerge = project.github!.addWorkflow('auto-merge');
+autoMerge.on({
+  pullRequestTarget: { types: ['opened', 'reopened', 'ready_for_review'] },
+});
+autoMerge.addJob('auto-merge', {
+  runsOn: ['ubuntu-latest'],
+  permissions: {
+    contents: github.workflows.JobPermission.WRITE,
+    pullRequests: github.workflows.JobPermission.WRITE,
+  },
+  if: "github.actor == 'dependabot[bot]'",
+  steps: [
     {
-      name: 'Enable auto-merge for patch updates',
-      if: "steps.metadata.outputs.update-type == 'version-update:semver-patch'",
+      name: 'Enable auto-merge',
       run: 'gh pr merge --auto --squash "$PR_URL"',
       env: {
         PR_URL: '${{ github.event.pull_request.html_url }}',
         GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}',
       },
     },
+  ],
+});
+
+// ─── Dependency Review ─────────────────────────────────────────────────────────
+const depReview = project.github!.addWorkflow('dependency-review');
+depReview.on({ pullRequest: {} });
+depReview.addJob('dependency-review', {
+  runsOn: ['ubuntu-latest'],
+  permissions: {
+    contents: github.workflows.JobPermission.READ,
+  },
+  steps: [
+    { name: 'Checkout', uses: 'actions/checkout@v6' },
+    { name: 'Dependency Review', uses: 'actions/dependency-review-action@v4' },
   ],
 });
 
