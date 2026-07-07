@@ -38,7 +38,7 @@ primary-vpc:
 
 primary-app: global-routing
 	@echo "Building and Deploying Application..."
-	sam build -t ./samTemplate.yaml
+	sam build -t ./samTemplate.yaml --use-container
 	sam deploy --resolve-s3 --stack-name batch$(ENV) --capabilities CAPABILITY_IAM --region $(PRIMARY_REGION) --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides "Env=$(ENV)" "SESSender=$(SES_IDENTITY)" "SESRecipient=$(SES_IDENTITY)" "SESIdentityName=$(SES_IDENTITY)" "SourceBucket=$(shell aws cloudformation list-stack-resources --region $(PRIMARY_REGION) --stack-name regionalVPC$(ENV) --query "StackResourceSummaries[?LogicalResourceId=='SourceBucket'].{PhysicalResourceId: PhysicalResourceId}" --output text)" --disable-rollback
 
 secondary-app: primary-app
@@ -74,7 +74,98 @@ failover-plan: active-region-table
 	@aws cloudformation deploy --stack-name failover-plan$(ENV) --region $(PRIMARY_REGION) --template-file failover.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides Env=$(ENV) NamingPrefix=$(NAMING_PREFIX) PrimaryRegion=$(PRIMARY_REGION) SecondaryRegion=$(SECONDARY_REGION) --no-fail-on-empty-changeset
 	@echo "Finished ARC Region Switch Plan stack"
 
-deploy: test-creds global active-region-table init-active-region primary-vpc secondary-vpc global-routing primary-app secondary-app failover-plan dashboard
+ngrh: dashboard failover-plan
+	@echo "Deploying NGRH Resilience Model..."
+	$(eval APP_ARN_PRIMARY := $(shell aws cloudformation describe-stacks --region $(PRIMARY_REGION) --stack-name batch$(ENV) --query "Stacks[0].StackId" --output text))
+	$(eval APP_ARN_STANDBY := $(shell aws cloudformation describe-stacks --region $(SECONDARY_REGION) --stack-name batch$(ENV) --query "Stacks[0].StackId" --output text))
+	$(eval GLOBAL_BASE_ARN := $(shell aws cloudformation describe-stacks --region $(PRIMARY_REGION) --stack-name global-base$(ENV) --query "Stacks[0].StackId" --output text))
+	$(eval GLOBAL_ROUTING_ARN := $(shell aws cloudformation describe-stacks --region $(PRIMARY_REGION) --stack-name global-routing$(ENV) --query "Stacks[0].StackId" --output text))
+	$(eval VPC_ARN_PRIMARY := $(shell aws cloudformation describe-stacks --region $(PRIMARY_REGION) --stack-name regionalVPC$(ENV) --query "Stacks[0].StackId" --output text))
+	$(eval VPC_ARN_STANDBY := $(shell aws cloudformation describe-stacks --region $(SECONDARY_REGION) --stack-name regionalVPC$(ENV) --query "Stacks[0].StackId" --output text))
+	$(eval ACTIVE_REGION_TABLE_ARN := $(shell aws cloudformation describe-stacks --region $(PRIMARY_REGION) --stack-name active-region-table$(ENV) --query "Stacks[0].StackId" --output text))
+	$(eval FAILOVER_PLAN_ARN := $(shell aws cloudformation describe-stacks --region $(PRIMARY_REGION) --stack-name failover-plan$(ENV) --query "Stacks[0].StackId" --output text))
+	@aws cloudformation deploy \
+		--stack-name ngrh-ngrh$(ENV) \
+		--region $(PRIMARY_REGION) \
+		--template-file ngrh.yaml \
+		--capabilities CAPABILITY_NAMED_IAM \
+		--parameter-overrides \
+			Env=$(ENV) \
+			PrimaryRegion=$(PRIMARY_REGION) \
+			StandbyRegion=$(SECONDARY_REGION) \
+			AppArnPrimary=$(APP_ARN_PRIMARY) \
+			AppArnStandby=$(APP_ARN_STANDBY) \
+			GlobalBaseArn=$(GLOBAL_BASE_ARN) \
+			GlobalRoutingArn=$(GLOBAL_ROUTING_ARN) \
+			VpcArnPrimary=$(VPC_ARN_PRIMARY) \
+			VpcArnStandby=$(VPC_ARN_STANDBY) \
+			ActiveRegionTableArn=$(ACTIVE_REGION_TABLE_ARN) \
+			FailoverPlanArn=$(FAILOVER_PLAN_ARN) \
+		--no-fail-on-empty-changeset || \
+	(echo "NGRH deploy failed (known CFN defect). Cleaning up and retrying..." && \
+		aws cloudformation delete-stack --stack-name ngrh-ngrh$(ENV) --region $(PRIMARY_REGION) && \
+		aws cloudformation wait stack-delete-complete --stack-name ngrh-ngrh$(ENV) --region $(PRIMARY_REGION) && \
+		aws cloudformation deploy \
+			--stack-name ngrh-ngrh$(ENV) \
+			--region $(PRIMARY_REGION) \
+			--template-file ngrh.yaml \
+			--capabilities CAPABILITY_NAMED_IAM \
+			--parameter-overrides \
+				Env=$(ENV) \
+				PrimaryRegion=$(PRIMARY_REGION) \
+				StandbyRegion=$(SECONDARY_REGION) \
+				AppArnPrimary=$(APP_ARN_PRIMARY) \
+				AppArnStandby=$(APP_ARN_STANDBY) \
+				GlobalBaseArn=$(GLOBAL_BASE_ARN) \
+				GlobalRoutingArn=$(GLOBAL_ROUTING_ARN) \
+				VpcArnPrimary=$(VPC_ARN_PRIMARY) \
+				VpcArnStandby=$(VPC_ARN_STANDBY) \
+				ActiveRegionTableArn=$(ACTIVE_REGION_TABLE_ARN) \
+				FailoverPlanArn=$(FAILOVER_PLAN_ARN) \
+			--no-fail-on-empty-changeset)
+	@echo "NGRH model deployed!"
+
+ngrh-assess:
+	@echo "Waiting for NGRH resource discovery to complete..."
+	$(eval SERVICE_ARNS := $(shell aws cloudformation describe-stacks --region $(PRIMARY_REGION) --stack-name ngrh-ngrh$(ENV) --query "Stacks[0].Outputs[?OutputKey=='ServiceArns'].OutputValue" --output text))
+	@for svc_arn in $$(echo "$(SERVICE_ARNS)" | tr ',' ' '); do \
+		svc_name=$$(echo "$$svc_arn" | grep -oP '(?<=service/)[^/]+'); \
+		echo "Checking resource discovery for $$svc_name..."; \
+		attempts=0; \
+		while [ $$attempts -lt 80 ]; do \
+			count=$$(aws resiliencehubv2 list-resources --region $(PRIMARY_REGION) --service-arn "$$svc_arn" --query "length(serviceResources)" --output text 2>/dev/null | awk '{s+=$$1} END{print s+0}'); \
+			if [ "$$count" -gt 0 ]; then \
+				echo "  $$svc_name: $$count resources discovered"; \
+				break; \
+			fi; \
+			attempts=$$((attempts + 1)); \
+			sleep 15; \
+		done; \
+		if [ $$attempts -ge 80 ]; then \
+			echo "  WARNING: $$svc_name resource discovery timed out (20 min)"; \
+		fi; \
+	done
+	@echo ""
+	@echo "Starting failure mode assessments..."
+	@for svc_arn in $$(echo "$(SERVICE_ARNS)" | tr ',' ' '); do \
+		svc_name=$$(echo "$$svc_arn" | grep -oP '(?<=service/)[^/]+'); \
+		echo "  Assessing $$svc_name..."; \
+		aws resiliencehubv2 start-failure-mode-assessment --region $(PRIMARY_REGION) --service-arn "$$svc_arn" --no-cli-pager 2>&1 | head -3; \
+	done
+	@echo "Assessments started! Results available in ~10-15 minutes."
+
+destroy-ngrh:
+	@echo "Destroying NGRH stack..."
+	$(eval NGRH_BUCKET := $(shell aws cloudformation describe-stacks --region $(PRIMARY_REGION) --stack-name ngrh-ngrh$(ENV) --query "Stacks[0].Outputs[?OutputKey=='NgrhBucketName'].OutputValue" --output text 2>/dev/null))
+	@if [ -n "$(NGRH_BUCKET)" ] && [ "$(NGRH_BUCKET)" != "None" ]; then \
+		echo "Emptying NGRH bucket $(NGRH_BUCKET)..."; \
+		./cleanup.sh $(NGRH_BUCKET); \
+	fi
+	@aws cloudformation delete-stack --stack-name ngrh-ngrh$(ENV) --region $(PRIMARY_REGION)
+	@aws cloudformation wait stack-delete-complete --stack-name ngrh-ngrh$(ENV) --region $(PRIMARY_REGION)
+	@echo "NGRH stack destroyed!"
+
+deploy: test-creds global active-region-table init-active-region primary-vpc secondary-vpc global-routing primary-app secondary-app failover-plan dashboard ngrh
 
 chaos: test-creds chaos-primary chaos-secondary
 
@@ -91,7 +182,19 @@ destroy-chaos:
 destroy-all:
 	@echo "Removing all cloudformation stacks!!"
 	@echo ""
+	@echo "=== Phase 0: Remove NGRH model (depends on all other stacks) ==="
+	@-$(MAKE) destroy-ngrh 2>/dev/null || true
+	@echo ""
 	@echo "=== Phase 1: Remove application stacks (depend on secrets from routing/VPC stacks) ==="
+	@echo "Disabling DynamoDB deletion protection (required before stack delete)..."
+	@-for region in $(SECONDARY_REGION) $(PRIMARY_REGION); do \
+		for table in $$(aws cloudformation list-stack-resources --region $$region --stack-name batch$(ENV) \
+			--query "StackResourceSummaries[?ResourceType=='AWS::DynamoDB::Table'].PhysicalResourceId" \
+			--output text 2>/dev/null); do \
+			aws dynamodb update-table --region $$region --table-name "$$table" \
+				--no-deletion-protection-enabled --no-cli-pager 2>/dev/null || true; \
+		done; \
+	done
 	@echo "Removing application from secondary region..."
 	@-sam delete --stack-name batch$(ENV) --region $(SECONDARY_REGION) --no-prompts
 	@echo "Removing application from primary region..."
