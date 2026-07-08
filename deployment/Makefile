@@ -8,7 +8,9 @@
 ENV=-dev
 PRIMARY_REGION=us-east-1
 SECONDARY_REGION=us-west-2
-SES_IDENTITY=sender@example.com
+# Unique per ENV so concurrent/leftover stacks never hit the SES EmailIdentity
+# name-conflict check (AWS::EarlyValidation::ResourceExistenceCheck)
+SES_IDENTITY=sender$(ENV)@example.com
 EMPTY_LIST='{ "Objects": null }'
 .DEFAULT_GOAL := test-creds
 MAKE=/usr/bin/make
