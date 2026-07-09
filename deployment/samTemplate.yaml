@@ -477,6 +477,7 @@ Resources:
           - id: CKV_AWS_173
             comment: Environment variables do not contain secrets
     Properties:
+      Timeout: 29
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${PowerToolsLambdaLayerAccountId}:layer:AWSLambdaPowertoolsPythonV2:20
       Tracing: Active
@@ -568,6 +569,7 @@ Resources:
           - id: CKV_AWS_119
             comment: Uses SSE with KMS managed key, customer CMK not required for sample
     Properties:
+      DeletionProtectionEnabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
       SSESpecification:
@@ -589,6 +591,7 @@ Resources:
           - id: CKV_AWS_119
             comment: Uses SSE with KMS managed key, customer CMK not required for sample
     Properties:
+      DeletionProtectionEnabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
       SSESpecification:

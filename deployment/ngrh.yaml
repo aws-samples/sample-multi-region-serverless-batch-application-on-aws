@@ -1,0 +1,339 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Next-Gen Resilience Hub (ResilienceHubV2) model for the multi-region serverless
+  batch application. Defines two resiliency policies (Tier-1 / Tier-2), one System,
+  three User Journeys, and three Services with CloudFormation-stack input sources
+  spanning both regions. Assessment execution is imperative (see `make ngrh-assess`).
+
+# ---------------------------------------------------------------------------
+# Parameters. Stack ARNs are resolved at deploy time by the `ngrh` Makefile
+# target (describe-stacks per region) so this template is portable across any
+# account/Env without hardcoded resource names.
+# ---------------------------------------------------------------------------
+Parameters:
+  Env:
+    Type: String
+    Default: ""
+    Description: Environment suffix (e.g. -dev). Must match the app deploy ENV.
+  PrimaryRegion:
+    Type: String
+    Default: us-east-1
+  StandbyRegion:
+    Type: String
+    Default: us-west-2
+  AppArnPrimary:
+    Type: String
+    Description: StackId ARN of the SAM application stack (batch) in the primary region
+  AppArnStandby:
+    Type: String
+    Description: StackId ARN of the SAM application stack (batch) in the standby region
+  GlobalBaseArn:
+    Type: String
+    Description: StackId ARN of the global-base stack (DynamoDB Global Table, secrets)
+  GlobalRoutingArn:
+    Type: String
+    Description: StackId ARN of the global-routing stack (S3 MRAP, replication Lambda)
+  VpcArnPrimary:
+    Type: String
+    Description: StackId ARN of the regionalVPC stack in the primary region
+  VpcArnStandby:
+    Type: String
+    Description: StackId ARN of the regionalVPC stack in the standby region
+  ActiveRegionTableArn:
+    Type: String
+    Description: StackId ARN of the active-region-table stack (DynamoDB Global Table for failover state)
+  FailoverPlanArn:
+    Type: String
+    Description: StackId ARN of the ARC Region Switch failover-plan stack
+
+Resources:
+
+  # -------------------------------------------------------------------------
+  # Shared NGRH bucket — reports go under /reports/, design files under
+  # /design-files/. Name is CFN-generated (random suffix) to avoid collisions.
+  # -------------------------------------------------------------------------
+  NgrhBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-reports-90d
+            Status: Enabled
+            Prefix: reports/
+            ExpirationInDays: 90
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 7
+          - Id: abort-incomplete-uploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+            ExpiredObjectDeleteMarker: true
+
+  # -------------------------------------------------------------------------
+  # Invoker role NGRH assumes to discover resources / run assessments.
+  # Trust resiliencehub.amazonaws.com, attach the managed execution policy.
+  # -------------------------------------------------------------------------
+  InvokerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "ngrh-invoker${Env}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: resiliencehub.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSResilienceHubV2AssessmentExecutionPolicy
+      Policies:
+        - PolicyName: ngrh-bucket-access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt NgrhBucket.Arn
+                  - !Sub "${NgrhBucket.Arn}/*"
+
+  # -------------------------------------------------------------------------
+  # Resiliency policies.
+  # Tier-1: Batch processing pipeline (data integrity, no loss)
+  # Tier-2: Monitoring/dashboard (non-critical, higher RPO acceptable)
+  # DR approach ACTIVE_PASSIVE — primary processes, standby waits for failover.
+  # -------------------------------------------------------------------------
+  TierOnePolicy:
+    Type: AWS::ResilienceHubV2::Policy
+    Properties:
+      Name: !Sub "ngrh-tier1${Env}"
+      Description: "Tier-1 (batch processing pipeline): RTO 15m / RPO 15m -- S3 MRAP replication SLA + DDB Global Table"
+      AvailabilitySlo:
+        Target: 99.99
+      MultiAz: {}
+      MultiRegion:
+        RtoInMinutes: 15
+        RpoInMinutes: 15
+        DisasterRecoveryApproach: HOT_STANDBY
+
+  TierTwoPolicy:
+    Type: AWS::ResilienceHubV2::Policy
+    Properties:
+      Name: !Sub "ngrh-tier2${Env}"
+      Description: "Tier-2 (dashboard/monitoring): RTO 30m / RPO 15m -- operational visibility, not on critical path"
+      AvailabilitySlo:
+        Target: 99.9
+      MultiAz: {}
+      MultiRegion:
+        RtoInMinutes: 30
+        RpoInMinutes: 15
+        DisasterRecoveryApproach: HOT_STANDBY
+
+  # -------------------------------------------------------------------------
+  # System (the application container).
+  # -------------------------------------------------------------------------
+  System:
+    Type: AWS::ResilienceHubV2::System
+    Properties:
+      Name: !Sub "serverless-batch${Env}"
+      Description: "Multi-region serverless batch processing application with S3 MRAP and DynamoDB Global Tables"
+
+  # -------------------------------------------------------------------------
+  # User Journeys.
+  # -------------------------------------------------------------------------
+  SubmitBatchJourney:
+    Type: AWS::ResilienceHubV2::UserJourney
+    Properties:
+      SystemIdentifier: !GetAtt System.SystemArn
+      Name: "SubmitAndProcessBatch"
+      Description: "Upload file to S3 -> split -> validate -> process chunks -> merge -> notify"
+
+  MonitorBatchJourney:
+    Type: AWS::ResilienceHubV2::UserJourney
+    Properties:
+      SystemIdentifier: !GetAtt System.SystemArn
+      Name: "MonitorBatchStatus"
+      Description: "API Gateway -> GetData Lambda -> DynamoDB query for batch status"
+
+  # -------------------------------------------------------------------------
+  # Services. Each spans both regions and links to journeys via
+  # AssociatedSystems.UserJourneyIds. PolicyArn = strictest tier among
+  # the service's journeys.
+  #
+  # DependsOn serialization works around the NGRH CFN parallel-create defect.
+  # -------------------------------------------------------------------------
+  BatchProcessingService:
+    Type: AWS::ResilienceHubV2::Service
+    Properties:
+      Name: !Sub "batch-processing${Env}"
+      Regions: [!Ref PrimaryRegion, !Ref StandbyRegion]
+      PolicyArn: !GetAtt TierOnePolicy.PolicyArn
+      DependencyDiscovery: ENABLED
+      PermissionModel:
+        InvokerRoleName: !Ref InvokerRole
+      ReportConfiguration:
+        ReportOutput:
+          - S3:
+              BucketPath: !Sub "s3://${NgrhBucket}/reports/"
+              BucketOwner: !Ref "AWS::AccountId"
+      AssociatedSystems:
+        - SystemArn: !GetAtt System.SystemArn
+          UserJourneyIds:
+            - !GetAtt SubmitBatchJourney.UserJourneyId
+      InputSources:
+        # SAM application stacks (Lambda functions, Step Functions, DynamoDB tables, S3 triggers)
+        - ResourceConfiguration: { CfnStackArn: !Ref AppArnPrimary }
+        - ResourceConfiguration: { CfnStackArn: !Ref AppArnStandby }
+        # Global resources (DynamoDB Global Table for financial data)
+        - ResourceConfiguration: { CfnStackArn: !Ref GlobalBaseArn }
+        # Global routing (S3 Multi-Region Access Point for cross-region replication)
+        - ResourceConfiguration: { CfnStackArn: !Ref GlobalRoutingArn }
+        # VPC (S3 source buckets, VPC endpoints)
+        - ResourceConfiguration: { CfnStackArn: !Ref VpcArnPrimary }
+        - ResourceConfiguration: { CfnStackArn: !Ref VpcArnStandby }
+        # Active region table (failover state)
+        - ResourceConfiguration: { CfnStackArn: !Ref ActiveRegionTableArn }
+        # ARC Region Switch plan
+        - ResourceConfiguration: { CfnStackArn: !Ref FailoverPlanArn }
+      Assertions:
+        - Text: >-
+            Regional failover is automated via ARC Region Switch plan which
+            updates the ActiveRegion DynamoDB Global Table record and shifts
+            processing to the standby region. The ActiveRegionMonitor Lambda
+            reads this record to determine which region is active.
+        - Text: >-
+            This architecture uses regional failover (active/passive) rather
+            than AZ-level isolation mechanisms (zonal shift, zonal autoshift).
+            The ARC Region Switch plan triggers failover to the standby region
+            as the response to regional impairments.
+        - Text: >-
+            S3 data durability is provided by S3 Multi-Region Access Point
+            (MRAP) with cross-region replication. Files uploaded to either
+            region's source bucket are replicated bidirectionally via MRAP,
+            ensuring RPO 0 for batch input data.
+        - Text: >-
+            DynamoDB Global Tables provide strongly-consistent cross-region
+            replication for the BatchStateTable (batch processing coordination
+            state) and ActiveRegion table (failover state). RPO is effectively 0
+            for operational state tracking.
+        - Text: >-
+            The FinancialTable is static reference/lookup data seeded identically
+            to both regions at deploy time from a CSV file via CloudFormation
+            custom resource. It is not written to during batch processing — only
+            read via API Gateway. Both regions have identical copies from
+            deployment, so cross-region replication is unnecessary. This is not
+            a Global Table by design.
+        - Text: >-
+            The ErrorTable stores validation-rejected input records per region.
+            It is a diagnostic log, not business-critical state. On failover,
+            the reconciliation process re-submits unfinished files in the standby
+            region, which naturally regenerates any error records from invalid
+            input. Cross-region replication of error records is unnecessary.
+        - Text: >-
+            Step Functions state machines are regional resources. In-flight
+            executions in a failed region are lost but the batch can be
+            re-submitted in the standby region because input data persists
+            in S3 MRAP and DynamoDB Global Tables.
+        - Text: >-
+            The 15-minute reconciliation wait after failover is an intentional
+            design decision aligned with the S3 Replication Time Control (RTC)
+            SLA which guarantees replication within 15 minutes. The
+            DelayedReconciliation Step Function waits for this period to ensure
+            all in-flight S3 objects have replicated to the standby region
+            before re-submitting unfinished batches. This wait is part of the
+            RPO budget, not additive to it.
+        - Text: >-
+            In-flight Step Functions executions are lost on failover by design.
+            Recovery is handled by the reconciliation process: the
+            BatchStateTable (DynamoDB Global Table) tracks each file's
+            processing status. After failover, the ReconciliationTrigger
+            Lambda queries BatchStateTable for files in INITIALIZED status,
+            waits for S3 replication to complete, then re-copies those files
+            into the standby region's input directory to restart processing.
+            No manual intervention is required.
+
+  DashboardService:
+    DependsOn: BatchProcessingService
+    Type: AWS::ResilienceHubV2::Service
+    Properties:
+      Name: !Sub "dashboard${Env}"
+      Regions: [!Ref PrimaryRegion, !Ref StandbyRegion]
+      PolicyArn: !GetAtt TierTwoPolicy.PolicyArn
+      DependencyDiscovery: ENABLED
+      PermissionModel:
+        InvokerRoleName: !Ref InvokerRole
+      ReportConfiguration:
+        ReportOutput:
+          - S3:
+              BucketPath: !Sub "s3://${NgrhBucket}/reports/"
+              BucketOwner: !Ref "AWS::AccountId"
+      AssociatedSystems:
+        - SystemArn: !GetAtt System.SystemArn
+          UserJourneyIds:
+            - !GetAtt MonitorBatchJourney.UserJourneyId
+      InputSources:
+        # SAM app stack contains the API Gateway, GetData Lambda, DynamoDB tables
+        - ResourceConfiguration: { CfnStackArn: !Ref AppArnPrimary }
+        - ResourceConfiguration: { CfnStackArn: !Ref AppArnStandby }
+        # Global base (DynamoDB Global Table)
+        - ResourceConfiguration: { CfnStackArn: !Ref GlobalBaseArn }
+        # Active region table (failover state — dashboard reads this to know which region is active)
+        - ResourceConfiguration: { CfnStackArn: !Ref ActiveRegionTableArn }
+        # ARC Region Switch plan
+        - ResourceConfiguration: { CfnStackArn: !Ref FailoverPlanArn }
+      Assertions:
+        - Text: >-
+            The dashboard is an API Gateway + Lambda + DynamoDB read path
+            for batch status monitoring. It does not process batch data and
+            has no dependency on S3, Step Functions, or SES.
+        - Text: >-
+            Regional failover is automated via ARC Region Switch plan which
+            updates the ActiveRegion DynamoDB Global Table record. The
+            dashboard reads from DynamoDB Global Tables which replicate
+            cross-region, so status data is available in both regions.
+        - Text: >-
+            API Gateway is a regional resource. After failover, clients
+            must be directed to the standby region's API endpoint. This
+            is handled by the ActiveRegion record update.
+        - Text: >-
+            The FinancialTable is static reference/lookup data seeded identically
+            to both regions at deploy time. The dashboard's GetData Lambda reads
+            from the local region's copy. Both regions have identical data from
+            deployment — cross-region replication is unnecessary for this table.
+        - Text: >-
+            The ErrorTable stores per-region validation reject records. It is a
+            diagnostic log, not business-critical state. Cross-region replication
+            is unnecessary — error records are regenerated naturally when files
+            are re-processed in the standby region after failover.
+
+Outputs:
+  SystemArn:
+    Value: !GetAtt System.SystemArn
+  TierOnePolicyArn:
+    Value: !GetAtt TierOnePolicy.PolicyArn
+  TierTwoPolicyArn:
+    Value: !GetAtt TierTwoPolicy.PolicyArn
+  NgrhBucketName:
+    Description: NGRH shared bucket (reports, design files). Empty before stack delete.
+    Value: !Ref NgrhBucket
+  ServiceArns:
+    Description: Comma-separated service ARNs (used by `make ngrh-assess`)
+    Value: !Join
+      - ","
+      - - !GetAtt BatchProcessingService.ServiceArn
+        - !GetAtt DashboardService.ServiceArn

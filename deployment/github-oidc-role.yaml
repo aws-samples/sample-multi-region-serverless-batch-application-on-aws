@@ -110,6 +110,7 @@ Resources:
               - application-autoscaling:*
               - tag:*
               - resource-groups:*
+              - resiliencehub:*
             Resource: '*'
             Condition:
               StringEquals:

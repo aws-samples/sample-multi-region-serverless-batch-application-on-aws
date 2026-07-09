@@ -128,7 +128,8 @@
             "End": true
           }
         }
-      }
+      },
+      "MaxConcurrency": 40
     },
     "Write output file": {
       "Type": "Task",
