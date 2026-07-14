@@ -108,7 +108,10 @@ autoApprove.addJob('auto-approve', {
 // ─── Auto-merge for Dependabot PRs ─────────────────────────────────────────────
 const autoMerge = project.github!.addWorkflow('auto-merge');
 autoMerge.on({
-  pullRequestTarget: { types: ['opened', 'reopened', 'ready_for_review'] },
+  // 'synchronize' re-arms auto-merge on every push to the Dependabot branch,
+  // so a single flaky `gh pr merge --auto` call at open time no longer strands
+  // a PR (this repo has no retry-automerge fallback workflow).
+  pullRequestTarget: { types: ['opened', 'reopened', 'ready_for_review', 'synchronize'] },
 });
 autoMerge.addJob('auto-merge', {
   runsOn: ['ubuntu-latest'],
