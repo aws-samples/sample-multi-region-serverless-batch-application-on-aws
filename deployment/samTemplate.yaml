@@ -376,12 +376,12 @@ Resources:
         UsagePlan:
           CreateUsagePlan: PER_API
           UsagePlanName: "batch-api-usage-plan"
-          Quota:
-            Limit: 100
-            Period: DAY
+          # Daily Quota removed: internal batch traffic (up to 600 records/chunk,
+          # Map MaxConcurrency 40) must not be capped per-day. Throttle still
+          # protects the backend from unbounded load.
           Throttle:
-            BurstLimit: 50
-            RateLimit: 100
+            BurstLimit: 100
+            RateLimit: 200
           Description: "Batch API Usage Plan"
       AccessLogSetting:
         DestinationArn: !Sub ${ApiAccessLogGroup.Arn}
@@ -831,6 +831,14 @@ Resources:
               Action:
                 - cloudwatch:PutMetricData
               Resource: "*"
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt AsyncLambdaDLQ.QueueName
+      EventInvokeConfig:
+        MaximumRetryAttempts: 2
+        DestinationConfig:
+          OnFailure:
+            Type: SQS
+            Destination: !GetAtt AsyncLambdaDLQ.Arn
       Environment:
         Variables:
           ACTIVE_REGION_TABLE: !Sub "${NamingPrefix}ActiveRegion${Env}"
@@ -907,6 +915,14 @@ Resources:
                 - dynamodb:GetItem
               Resource:
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${NamingPrefix}ActiveRegion${Env}"
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt AsyncLambdaDLQ.QueueName
+      EventInvokeConfig:
+        MaximumRetryAttempts: 2
+        DestinationConfig:
+          OnFailure:
+            Type: SQS
+            Destination: !GetAtt AsyncLambdaDLQ.Arn
       Environment:
         Variables:
           STATE_MACHINE_EXECUTION_NAME: "BlogBatchMainOrchestrator"
@@ -1093,3 +1109,106 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       KmsMasterKeyId: alias/aws/sns
+
+  # --- Resilience hardening (fix/resilience-dlq-quota-alarms) ---
+  AsyncLambdaDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${NamingPrefix}AsyncLambdaDLQ${Env}"
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+
+  OrchestratorFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "batch-orchestrator-failed${Env}"
+      AlarmDescription: "BlogBatchMainOrchestrator had a failed execution"
+      Namespace: AWS/States
+      MetricName: ExecutionsFailed
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref BlogBatchMainOrchestrator
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref SNSTopic
+
+  ChunkProcessorFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "batch-chunk-processor-failed${Env}"
+      AlarmDescription: "BlogBatchProcessChunk had a failed execution"
+      Namespace: AWS/States
+      MetricName: ExecutionsFailed
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref BlogBatchProcessChunk
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref SNSTopic
+
+  IngestionLambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "batch-ingestion-lambda-errors${Env}"
+      AlarmDescription: "S3 notification (ingestion) Lambda errors - silent file loss risk"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref S3NotificationLambdaFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref SNSTopic
+
+  ReconciliationLambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "batch-reconciliation-lambda-errors${Env}"
+      AlarmDescription: "Reconciliation Lambda errors during failover recovery"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AutomationReconciliationFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref SNSTopic
+
+  AsyncLambdaDLQDepthAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "batch-async-dlq-not-empty${Env}"
+      AlarmDescription: "Messages landed in the async Lambda DLQ (failed async invocations)"
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt AsyncLambdaDLQ.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref SNSTopic
